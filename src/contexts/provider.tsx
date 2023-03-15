@@ -1,19 +1,27 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-const storedPrefix = window.localStorage && window.localStorage.getItem('pali_provider');
+const storedPrefix =
+  window.localStorage && window.localStorage.getItem('pali_provider');
 
-const defaultValue = { provider: window.pali ?? undefined, setProvider: ((state: any) => (state)) as any, setPrefix: ((state: any) => (state)) as any, prefix: storedPrefix || 'sys' };
+const defaultValue = {
+  provider: window.pali ?? undefined,
+  setProvider: ((state: any) => state) as any,
+  setPrefix: ((state: any) => state) as any,
+  prefix: storedPrefix || 'sys',
+  isLoading: false,
+  setIsLoading: ((state: any) => state) as any,
+};
 
 const ProviderContext = createContext(defaultValue);
 
 export const PaliWalletProvider = ({ children }: { children: any; }) => {
   const { pali } = window;
-  
+
   const [prefix, setPrefix] = useState('sys');
   const [provider, setProvider] = useState(pali ?? undefined);
   const [hydrated, setHydrated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const network = provider.request({ method: 'wallet_getNetwork', args: [] });
 
   useEffect(() => {
     const _provider = prefix === 'sys' ? window.pali : window.ethereum;
@@ -21,7 +29,7 @@ export const PaliWalletProvider = ({ children }: { children: any; }) => {
     setProvider(_provider);
 
     window.localStorage.setItem('pali_provider', prefix);
-  }, [prefix, network]);
+  }, [prefix]);
 
   useEffect(() => {
     setPrefix(storedPrefix);
@@ -34,7 +42,16 @@ export const PaliWalletProvider = ({ children }: { children: any; }) => {
   }
 
   return (
-    <ProviderContext.Provider value={{ provider, setProvider, setPrefix, prefix }}>
+    <ProviderContext.Provider
+      value={{
+        provider,
+        setProvider,
+        setPrefix,
+        prefix,
+        isLoading,
+        setIsLoading,
+      }}
+    >
       {children}
     </ProviderContext.Provider>
   );

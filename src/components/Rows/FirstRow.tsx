@@ -6,11 +6,11 @@ import { PrimaryButton } from '../Buttons/Button';
 import { data } from '../../data';
 import { useProviderContext } from '../../contexts/provider';
 import { usePaliMethods } from '../../contexts/requests';
+import { TrezorKeyring } from '../../services/trezor';
+import { LoadingComponent } from '../Loading';
 
 export const FirstRow = () => {
-  const { 
-    request,
-   } = usePaliMethods();
+  const { request } = usePaliMethods();
   const { prefix } = useProviderContext();
 
   const [output, setOutput] = useState('');
@@ -36,7 +36,7 @@ export const FirstRow = () => {
             text="Sign PSBT"
             type="button"
           />
-          <PrimaryButton 
+          <PrimaryButton
             onClick={() => onSubmit('getSignedPsbt')}
             text="Get signed PSBT"
             type="button"
@@ -55,16 +55,13 @@ export const FirstRow = () => {
 };
 
 const BasicActionsCard = () => {
-  const {
-    changeAccount,
-    connect,
-    disconnect,
-    getAccount,
-  } = usePaliMethods();
+  const { changeAccount, connect, disconnect, getAccount } = usePaliMethods();
+  const { setIsLoading, isLoading } = useProviderContext();
   const [output, setOutput] = useState('');
+  const trezor = new TrezorKeyring({ setIsLoading });
 
-  const handleExecution = async (fn: () => any) => {
-    const data = await fn();
+  const handleExecution = async (methodName: string) => {
+    const data = await trezor[methodName]();
     setOutput(JSON.stringify(data));
   };
 
@@ -72,23 +69,24 @@ const BasicActionsCard = () => {
     <Card title="BASIC ACTIONS">
       <div className="grid grid-rows-3 gap-y-3 rounded-full">
         <PrimaryButton
-          text="Connect"
-          onClick={() => handleExecution(connect)}
+          text="Connect Trezor"
+          onClick={() => handleExecution('initialize')}
+          loadingComponent={isLoading && <LoadingComponent />}
         />
 
         <PrimaryButton
           text="Get account"
-          onClick={() => handleExecution(getAccount)}
+          // onClick={() => handleExecution(getAccount)}
         />
 
         <PrimaryButton
           text="Change account"
-          onClick={() => handleExecution(changeAccount)}
+          // onClick={() => handleExecution(changeAccount)}
         />
 
         <PrimaryButton
           text="Disconnect"
-          onClick={() => handleExecution(disconnect)}
+          // onClick={() => handleExecution(disconnect)}
         />
 
         <Output output={output || ' '} />

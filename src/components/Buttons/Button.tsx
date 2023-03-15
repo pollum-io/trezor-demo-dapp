@@ -1,4 +1,6 @@
 import React from 'react';
+import { useProviderContext } from '../../contexts/provider';
+import { LoadingComponent } from '../Loading';
 
 interface IButton {
   className?: string;
@@ -9,6 +11,7 @@ interface IButton {
   text: string;
   type?: 'button' | 'submit' | 'reset';
   width?: string;
+  loadingComponent?: any;
 }
 
 export const PrimaryButton: React.FC<IButton> = ({
@@ -18,17 +21,22 @@ export const PrimaryButton: React.FC<IButton> = ({
   onClick,
   text,
   type = 'button',
-}) => (
-  <button
-    className="bg-bkg-4 py-1.5 rounded-full cursor-pointer h-max font-poppins hover:bg-brand-royalblue"
-    disabled={disabled || loading}
-    onClick={onClick}
-    type={type}
-    id={id}
-  >
-    {text}
-  </button>
-);
+  loadingComponent,
+}) => {
+  const {} = useProviderContext();
+  return (
+    <button
+      className="bg-bkg-4 py-1.5 rounded-full cursor-pointer h-max font-poppins hover:bg-brand-royalblue flex flex-row p-5 items-center"
+      disabled={disabled || loading}
+      onClick={onClick}
+      type={type}
+      id={id}
+    >
+      {text}
+      {loadingComponent}
+    </button>
+  );
+};
 
 interface IInput {
   placeholder: string;
