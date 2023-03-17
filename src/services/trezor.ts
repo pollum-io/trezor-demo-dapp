@@ -15,14 +15,6 @@ import {
 import { hasProperty } from '@metamask/utils';
 
 const hdPathString = `m/44'/60'/0'/0/0`;
-const SLIP0044TestnetPath = `m/44'/1'/0'/0`;
-
-const ALLOWED_HD_PATHS = {
-  [hdPathString]: true,
-  [SLIP0044TestnetPath]: true,
-} as const;
-
-const keyringType = 'Trezor Hardware';
 const pathBase = 'm';
 const MAX_INDEX = 1000;
 const DELAY_BETWEEN_POPUPS = 1000;
@@ -33,16 +25,12 @@ const TREZOR_CONNECT_MANIFEST = {
 
 export interface TrezorControllerOptions {
   hdPath?: string;
-  accounts?: string[];
-  page?: number;
   perPage?: number;
   setIsLoading?: () => void;
 }
 
 export interface TrezorControllerState {
   hdPath: string;
-  accounts: readonly string[];
-  page: number;
   paths: Record<string, number>;
   perPage: number;
   unlockedAccount: number;
@@ -74,21 +62,12 @@ declare global {
 }
 
 export class TrezorKeyring {
-  static type: string = keyringType;
-  readonly type: string = keyringType;
-  isInitialized: boolean;
-  isWaiting: boolean;
-  accounts: readonly string[] = [];
   hdk: HDKey = new HDKey();
   setIsLoading: (isLoading: boolean) => void;
   hdPath: string = hdPathString;
   publicKey: string;
   chainCode: string;
-  page = 0;
-  perPage = 5;
-  unlockedAccount = 0;
   paths: Record<string, number> = {};
-  trezorConnectInitiated = false;
   model?: string;
 
   constructor(opts: TrezorControllerOptions = {}) {
@@ -99,22 +78,18 @@ export class TrezorKeyring {
         this.model = event.payload.features?.model;
       }
     });
-    TrezorConnect.on('device-connect', (event) => {
-      this.isInitialized = event.features?.initialized;
-    });
   }
 
   async initialize({ coin, slip44 }: { coin: string; slip44: string }) {
     this.setIsLoading(true);
-    let path: string;
 
     switch (coin) {
       case 'sys':
-        path = `m/84'/57'/0'`;
+        this.hdPath = `m/84'/57'/0'`;
         break;
 
       default:
-        path = `m/44'/${slip44}'/0'/0/0`;
+        this.hdPath = `m/44'/${slip44}'/0'/0/0`;
         break;
     }
 
@@ -129,7 +104,7 @@ export class TrezorKeyring {
 
       const address = await TrezorConnect.getAccountInfo({
         coin,
-        path,
+        path: this.hdPath,
       });
 
       this.setIsLoading(false);
@@ -171,34 +146,13 @@ export class TrezorKeyring {
     }
   }
 
-  async serialize(): Promise<TrezorControllerState> {
-    return Promise.resolve({
-      hdPath: this.hdPath,
-      accounts: this.accounts,
-      page: this.page,
-      paths: this.paths,
-      perPage: this.perPage,
-      unlockedAccount: this.unlockedAccount,
-    });
-  }
-
   async deserialize(opts: TrezorControllerOptions = {}) {
     this.hdPath = opts.hdPath ?? hdPathString;
-    this.accounts = opts.accounts ?? [];
-    this.page = opts.page ?? 0;
-    this.perPage = opts.perPage ?? 5;
     this.setIsLoading = opts.setIsLoading;
     return Promise.resolve();
   }
 
-  isUnlocked() {
-    return Boolean(this.hdk?.publicKey);
-  }
-
   async unlock() {
-    if (this.isUnlocked()) {
-      return Promise.resolve('already unlocked');
-    }
     return new Promise((resolve, reject) => {
       TrezorConnect.getPublicKey({
         path: this.hdPath,
@@ -220,95 +174,6 @@ export class TrezorKeyring {
     });
   }
 
-  setAccountToUnlock(index: number | string) {
-    this.unlockedAccount = parseInt(String(index), 10);
-  }
-
-  async addAccounts(n = 1): Promise<readonly string[]> {
-    return new Promise((resolve, reject) => {
-      this.unlock()
-        .then((_) => {
-          const from = this.unlockedAccount;
-          const to = from + n;
-
-          for (let i = from; i < to; i++) {
-            const address = this.#addressFromIndex(pathBase, i);
-            if (!this.accounts.includes(address)) {
-              this.accounts = [...this.accounts, address];
-            }
-            this.page = 0;
-          }
-          resolve(this.accounts);
-        })
-        .catch((e) => {
-          reject(e);
-        });
-    });
-  }
-
-  async getFirstPage() {
-    this.page = 0;
-    return this.#getPage(1);
-  }
-
-  async getNextPage() {
-    return this.#getPage(1);
-  }
-
-  async getPreviousPage() {
-    return this.#getPage(-1);
-  }
-  // @ts-ignore
-  async #getPage(
-    increment: number
-  ): Promise<{ address: string; balance: number | null; index: number }[]> {
-    this.page += increment;
-
-    if (this.page <= 0) {
-      this.page = 1;
-    }
-
-    return new Promise((resolve, reject) => {
-      this.unlock()
-        .then((_) => {
-          const from = (this.page - 1) * this.perPage;
-          const to = from + this.perPage;
-
-          const accounts: any[] = [];
-
-          for (let i = from; i < to; i++) {
-            const address = this.#addressFromIndex(pathBase, i);
-            accounts.push({
-              address,
-              balance: null,
-              index: i,
-            });
-            this.paths[ethUtil.toChecksumAddress(address)] = i;
-          }
-          resolve(accounts);
-        })
-        .catch((e) => {
-          reject(e);
-        });
-    });
-  }
-
-  async getAccounts() {
-    return Promise.resolve(this.accounts.slice());
-  }
-
-  removeAccount(address: string) {
-    if (
-      !this.accounts.map((a) => a.toLowerCase()).includes(address.toLowerCase())
-    ) {
-      throw new Error(`Address ${address} not found in this keyring`);
-    }
-
-    this.accounts = this.accounts.filter(
-      (a) => a.toLowerCase() !== address.toLowerCase()
-    );
-  }
-
   async signMessage(withAccount: string, data: string) {
     return this.signPersonalMessage(withAccount, data);
   }
@@ -316,46 +181,35 @@ export class TrezorKeyring {
   // For personal_sign, we need to prefix the message:
   async signPersonalMessage(withAccount: string, message: string) {
     return new Promise((resolve, reject) => {
-      this.unlock()
-        .then((status) => {
-          setTimeout(
-            () => {
-              TrezorConnect.ethereumSignMessage({
-                path: this.#pathFromAddress(withAccount),
-                message: ethUtil.stripHexPrefix(message),
-                hex: true,
-              })
-                .then((response) => {
-                  if (response.success) {
-                    if (
-                      response.payload.address !==
-                      ethUtil.toChecksumAddress(withAccount)
-                    ) {
-                      reject(
-                        new Error('signature doesnt match the right address')
-                      );
-                    }
-                    const signature = `0x${response.payload.signature}`;
-                    resolve(signature);
-                  } else {
-                    reject(
-                      // @ts-ignore
-                      new Error(response.payload?.error || 'Unknown error')
-                    );
-                  }
-                })
-                .catch((e) => {
-                  reject(new Error(e?.toString() || 'Unknown error'));
-                });
-              // This is necessary to avoid popup collision
-              // between the unlock & sign trezor popups
-            },
-            status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0
-          );
+      setTimeout(() => {
+        TrezorConnect.ethereumSignMessage({
+          path: this.#pathFromAddress(withAccount),
+          message: ethUtil.stripHexPrefix(message),
+          hex: true,
         })
-        .catch((e) => {
-          reject(new Error(e?.toString() || 'Unknown error'));
-        });
+          .then((response) => {
+            if (response.success) {
+              if (
+                response.payload.address !==
+                ethUtil.toChecksumAddress(withAccount)
+              ) {
+                reject(new Error('signature doesnt match the right address'));
+              }
+              const signature = `0x${response.payload.signature}`;
+              resolve(signature);
+            } else {
+              reject(
+                // @ts-ignore
+                new Error(response.payload?.error || 'Unknown error')
+              );
+            }
+          })
+          .catch((e) => {
+            reject(new Error(e?.toString() || 'Unknown error'));
+          });
+        // This is necessary to avoid popup collision
+        // between the unlock & sign trezor popups
+      }, DELAY_BETWEEN_POPUPS);
     });
   }
 
@@ -408,51 +262,6 @@ export class TrezorKeyring {
     }
     // @ts-ignore
     throw new Error(response.payload?.error || 'Unknown error');
-  }
-
-  async exportAccount() {
-    return Promise.reject(new Error('Not supported on this device'));
-  }
-
-  forgetDevice() {
-    this.accounts = [];
-    this.hdk = new HDKey();
-    this.page = 0;
-    this.unlockedAccount = 0;
-    this.paths = {};
-  }
-
-  /**
-   * Set the HD path to be used by the keyring. Only known supported HD paths are allowed.
-   *
-   * If the given HD path is already the current HD path, nothing happens. Otherwise the new HD
-   * path is set, and the wallet state is completely reset.
-   *
-   * @throws {Error] Throws if the HD path is not supported.
-   *
-   * @param hdPath - The HD path to set.
-   */
-  setHdPath(hdPath: keyof typeof ALLOWED_HD_PATHS) {
-    if (!ALLOWED_HD_PATHS[hdPath]) {
-      throw new Error(
-        `The setHdPath method does not support setting HD Path to ${hdPath}`
-      );
-    }
-
-    // Reset HDKey if the path changes
-    if (this.hdPath !== hdPath) {
-      this.hdk = new HDKey();
-      this.accounts = [];
-      this.page = 0;
-      this.perPage = 5;
-      this.unlockedAccount = 0;
-      this.paths = {};
-    }
-    this.hdPath = hdPath;
-  }
-
-  #normalize(buf: Buffer) {
-    return ethUtil.bufferToHex(buf).toString();
   }
 
   #addressFromIndex(basePath: string, i: number) {
