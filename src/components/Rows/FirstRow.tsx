@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 
 import { Card } from '../Card';
 import { Output } from '../Output';
-import { PrimaryButton } from '../Buttons/Button';
+import { DropdownButton, PrimaryButton } from '../Buttons/Button';
 import { data } from '../../data';
 import { useProviderContext } from '../../contexts/provider';
 import { usePaliMethods } from '../../contexts/requests';
 import { TrezorKeyring } from '../../services/trezor';
-import { LoadingComponent } from '../Loading';
 
 export const FirstRow = () => {
   const { request } = usePaliMethods();
@@ -55,23 +54,24 @@ export const FirstRow = () => {
 };
 
 const BasicActionsCard = () => {
-  const { changeAccount, connect, disconnect, getAccount } = usePaliMethods();
+  // const { changeAccount, connect, disconnect, getAccount } = usePaliMethods();
   const { setIsLoading, isLoading } = useProviderContext();
   const [output, setOutput] = useState('');
+  const [trezorNetwork, setTrezorNetwork] = useState<string>('sys');
   const trezor = new TrezorKeyring({ setIsLoading });
 
-  const handleExecution = async (methodName: string) => {
-    const data = await trezor[methodName]();
+  const handleExecution = async (methodName: string, params?: any) => {
+    const data = await trezor[methodName]({ ...params });
     setOutput(JSON.stringify(data));
   };
 
   return (
     <Card title="BASIC ACTIONS">
       <div className="grid grid-rows-3 gap-y-3 rounded-full">
-        <PrimaryButton
+        <DropdownButton
           text="Connect Trezor"
-          onClick={() => handleExecution('initialize')}
-          loadingComponent={isLoading && <LoadingComponent />}
+          method="initialize"
+          fn={handleExecution}
         />
 
         <PrimaryButton

@@ -52,22 +52,6 @@ export const Header = () => {
         <div className="w-64 bg-brand-royalblue px-4 py-1 rounded-full text-sm font-poppins flex items-center">
           Chain ID: {network.chainId || ''}
         </div>
-
-        <select
-          name="provider"
-          onChange={(event) => setPrefix(event.target.value)}
-          className="cursor-pointer w-64 bg-alert-darkwarning px-4 py-1 rounded-full text-sm font-poppins flex items-center"
-        >
-          {Object.values(options).map((option) => (
-            <option
-              key={option.value}
-              defaultValue={prefix}
-              value={option.value}
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
       </div>
     </div>
   );

@@ -75,30 +75,20 @@ declare global {
 
 export class TrezorKeyring {
   static type: string = keyringType;
-
   readonly type: string = keyringType;
-
   isInitialized: boolean;
   isWaiting: boolean;
-
   accounts: readonly string[] = [];
-
   hdk: HDKey = new HDKey();
-
   setIsLoading: (isLoading: boolean) => void;
-
   hdPath: string = hdPathString;
-
+  publicKey: string;
+  chainCode: string;
   page = 0;
-
   perPage = 5;
-
   unlockedAccount = 0;
-
   paths: Record<string, number> = {};
-
   trezorConnectInitiated = false;
-
   model?: string;
 
   constructor(opts: TrezorControllerOptions = {}) {
@@ -114,18 +104,32 @@ export class TrezorKeyring {
     });
   }
 
-  async initialize() {
+  async initialize({ coin, slip44 }: { coin: string; slip44: string }) {
     this.setIsLoading(true);
+    let path: string;
+
+    switch (coin) {
+      case 'sys':
+        path = `m/84'/57'/0'`;
+        break;
+
+      default:
+        path = `m/44'/${slip44}'/0'/0/0`;
+        break;
+    }
 
     window.TrezorConnect = TrezorConnect;
 
     try {
+      await TrezorConnect.dispose();
+
       await TrezorConnect.init({
         manifest: TREZOR_CONNECT_MANIFEST,
       });
-      const address = await TrezorConnect.ethereumGetAddress({
-        path: hdPathString,
-        showOnTrezor: true,
+
+      const address = await TrezorConnect.getAccountInfo({
+        coin,
+        path,
       });
 
       this.setIsLoading(false);
@@ -152,6 +156,19 @@ export class TrezorKeyring {
     // This method is not well documented, but the code it calls can be seen
     // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
     TrezorConnect.dispose();
+  }
+
+  async getEthereumPublicKey() {
+    try {
+      const walletInfo = await TrezorConnect.ethereumGetPublicKey({
+        path: this.hdPath,
+        showOnTrezor: true,
+      });
+
+      return walletInfo;
+    } catch (error) {
+      return error;
+    }
   }
 
   async serialize(): Promise<TrezorControllerState> {
