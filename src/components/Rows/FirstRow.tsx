@@ -32,28 +32,6 @@ export const FirstRow = () => {
     <div className="bg-bkg-3 md:rounded-md grid lg:grid-cols-3 gap-y-4 lg:gap-y-0 md:gap-x-4 py-5 justify-center align-center w-full h-max">
       <BasicActionsCard />
       <BasicEthereumActionsCard />
-
-      <Card title="SIGN ACTIONS">
-        <div className="grid grid-rows-3 gap-y-3 rounded-full">
-          <PrimaryButton
-            onClick={() => onSubmit('signAndSend')}
-            text="Sign PSBT"
-            type="button"
-          />
-          <PrimaryButton
-            onClick={() => onSubmit('getSignedPsbt')}
-            text="Get signed PSBT"
-            type="button"
-          />
-          <PrimaryButton
-            onClick={() => onSubmit('signTypedDataV4')}
-            text="Sign Typed Data V4"
-            type="button"
-          />
-
-          <Output output={output || ' '} />
-        </div>
-      </Card>
     </div>
   );
 };
@@ -77,7 +55,7 @@ const BasicActionsCard = () => {
           coins={Object.values(coins)}
         />
 
-        <PrimaryButton
+        {/* <PrimaryButton
           text="Get account"
           // onClick={() => handleExecution(getAccount)}
         />
@@ -90,7 +68,7 @@ const BasicActionsCard = () => {
         <PrimaryButton
           text="Disconnect"
           // onClick={() => handleExecution(disconnect)}
-        />
+        /> */}
 
         <Output output={output || ' '} />
       </div>
