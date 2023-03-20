@@ -15,7 +15,7 @@ import {
 import { hasProperty } from '@metamask/utils';
 
 const hdPathString = `m/44'/60'/0'/0/0`;
-const pathBase = 'm';
+const pathBase = `m/44'/60'/0'/0`;
 const MAX_INDEX = 1000;
 const DELAY_BETWEEN_POPUPS = 1000;
 const TREZOR_CONNECT_MANIFEST = {
@@ -65,8 +65,8 @@ export class TrezorKeyring {
   hdk: HDKey = new HDKey();
   setIsLoading: (isLoading: boolean) => void;
   hdPath: string = hdPathString;
-  publicKey: string;
-  chainCode: string;
+  publicKey: Buffer;
+  chainCode: Buffer;
   paths: Record<string, number> = {};
   model?: string;
 
@@ -80,7 +80,20 @@ export class TrezorKeyring {
     });
   }
 
-  async initialize({ coin, slip44 }: { coin: string; slip44: string }) {
+  async init() {
+    window.TrezorConnect = TrezorConnect;
+    try {
+      await TrezorConnect.init({
+        manifest: TREZOR_CONNECT_MANIFEST,
+      });
+      console.log(this?.hdk);
+      alert('Trezor was initialized succesfully!');
+    } catch (error) {
+      alert(error);
+    }
+  }
+
+  async getAccountInfo({ coin, slip44 }: { coin: string; slip44: string }) {
     this.setIsLoading(true);
 
     switch (coin) {
@@ -93,15 +106,7 @@ export class TrezorKeyring {
         break;
     }
 
-    window.TrezorConnect = TrezorConnect;
-
     try {
-      await TrezorConnect.dispose();
-
-      await TrezorConnect.init({
-        manifest: TREZOR_CONNECT_MANIFEST,
-      });
-
       const address = await TrezorConnect.getAccountInfo({
         coin,
         path: this.hdPath,
@@ -135,15 +140,33 @@ export class TrezorKeyring {
 
   async getEthereumPublicKey() {
     try {
-      const walletInfo = await TrezorConnect.ethereumGetPublicKey({
+      const { success, payload } = await TrezorConnect.getPublicKey({
+        coin: 'eth',
         path: this.hdPath,
-        showOnTrezor: true,
       });
 
-      return walletInfo;
+      if (success) {
+        const { publicKey, chainCode } = payload;
+
+        this.publicKey = Buffer.from(publicKey, 'hex');
+        this.chainCode = Buffer.from(chainCode, 'hex');
+
+        return {
+          publicKey: `0x${this.publicKey.toString('hex')}`,
+          chainCode: `0x${this.chainCode.toString('hex')}`,
+        };
+      }
+
+      return { success: false };
     } catch (error) {
       return error;
     }
+  }
+
+  async getAccountByIndex({ index }: { index: number }) {
+    const account = this.#addressFromIndex(pathBase, index);
+
+    return account;
   }
 
   async deserialize(opts: TrezorControllerOptions = {}) {
@@ -181,9 +204,9 @@ export class TrezorKeyring {
   // For personal_sign, we need to prefix the message:
   async signPersonalMessage(withAccount: string, message: string) {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         TrezorConnect.ethereumSignMessage({
-          path: this.#pathFromAddress(withAccount),
+          path: await this.#pathFromAddress(withAccount),
           message: ethUtil.stripHexPrefix(message),
           hex: true,
         })
@@ -241,7 +264,7 @@ export class TrezorKeyring {
     await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
 
     const response = await TrezorConnect.ethereumSignTypedData({
-      path: this.#pathFromAddress(address),
+      path: await this.#pathFromAddress(address),
       data: {
         types: { ...types, EIP712Domain: types.EIP712Domain ?? [] },
         message,
@@ -264,20 +287,23 @@ export class TrezorKeyring {
     throw new Error(response.payload?.error || 'Unknown error');
   }
 
-  #addressFromIndex(basePath: string, i: number) {
-    const dkey = this.hdk.derive(`${basePath}/${i}`);
+  async #addressFromIndex(basePath: string, i: number) {
+    this.hdPath = `${basePath}/${i}`;
+    await this.getEthereumPublicKey();
     const address = ethUtil
-      .publicToAddress(dkey.publicKey, true)
+      .publicToAddress(this.publicKey, true)
       .toString('hex');
     return ethUtil.toChecksumAddress(`0x${address}`);
   }
 
-  #pathFromAddress(address: string) {
+  async #pathFromAddress(address: string) {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
     let index = this.paths[checksummedAddress];
     if (typeof index === 'undefined') {
       for (let i = 0; i < MAX_INDEX; i++) {
-        if (checksummedAddress === this.#addressFromIndex(pathBase, i)) {
+        if (
+          checksummedAddress === (await this.#addressFromIndex(pathBase, i))
+        ) {
           index = i;
           break;
         }

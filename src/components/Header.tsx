@@ -6,7 +6,8 @@ import trezorLogo from '../assets/images/trezorLogo.svg';
 import { useProviderContext } from '../contexts/provider';
 
 export const Header = () => {
-  const { setPrefix, prefix } = useProviderContext();
+  const { setPrefix, prefix, trezor } = useProviderContext();
+  const { init } = trezor;
   const {
     state: { account, network },
   } = usePaliMethods();
@@ -27,6 +28,8 @@ export const Header = () => {
   useEffect(() => {
     if (stored !== options[prefix]) setPrefix(stored);
   }, []);
+
+  window.onload = () => alert('Initialize your Trezor before testing methods');
 
   return (
     <div className="flex flex-col md:flex-row justify-center py-10 md:justify-between align-center">
@@ -51,6 +54,13 @@ export const Header = () => {
         </div>
         <div className="w-64 bg-brand-royalblue px-4 py-1 rounded-full text-sm font-poppins flex items-center">
           Chain ID: {network.chainId || ''}
+        </div>
+
+        <div
+          onClick={init}
+          className="cursor-pointer w-64 bg-alert-darkwarning px-4 py-1 rounded-full text-sm font-poppins flex items-center"
+        >
+          Initialize Trezor
         </div>
       </div>
     </div>
