@@ -129,8 +129,29 @@ const BasicEthereumActionsCard = () => {
         />
 
         <PrimaryButton
-          text="Disconnect"
-          // onClick={() => handleExecution(disconnect)}
+          text="Sign message"
+          onClick={() =>
+            handleExecution('signMessage', {
+              accountIndex: 0,
+              data: 'PaliTrezor example',
+            })
+          }
+        />
+
+        <PrimaryButton
+          text="Sign Typed Data"
+          onClick={() =>
+            handleExecution('signTypedData', {
+              address: '0x1b02483786D647397C58940C65929f9ab662D748',
+              data: {
+                types: { EIP712Domain: [] },
+                domain: {},
+                message: {},
+                primaryType: 'EIP712Domain',
+              },
+              version: 'V4',
+            })
+          }
         />
 
         <Output output={output || ' '} />

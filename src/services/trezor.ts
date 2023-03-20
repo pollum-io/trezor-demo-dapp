@@ -86,7 +86,6 @@ export class TrezorKeyring {
       await TrezorConnect.init({
         manifest: TREZOR_CONNECT_MANIFEST,
       });
-      console.log(this?.hdk);
       alert('Trezor was initialized succesfully!');
     } catch (error) {
       alert(error);
@@ -164,7 +163,8 @@ export class TrezorKeyring {
   }
 
   async getAccountByIndex({ index }: { index: number }) {
-    const account = this.#addressFromIndex(pathBase, index);
+    const account = await this.#addressFromIndex(this.hdPath, index);
+    this.paths[account] = index;
 
     return account;
   }
@@ -197,29 +197,37 @@ export class TrezorKeyring {
     });
   }
 
-  async signMessage(withAccount: string, data: string) {
-    return this.signPersonalMessage(withAccount, data);
+  async signMessage({
+    accountIndex,
+    data,
+  }: {
+    accountIndex: number;
+    data: string;
+  }) {
+    return this.signPersonalMessage(accountIndex, data);
   }
 
   // For personal_sign, we need to prefix the message:
-  async signPersonalMessage(withAccount: string, message: string) {
+  async signPersonalMessage(accountIndex: number, message: string) {
+    const accountAddress = await this.getAccountByIndex({
+      index: accountIndex,
+    });
     return new Promise((resolve, reject) => {
       setTimeout(async () => {
         TrezorConnect.ethereumSignMessage({
-          path: await this.#pathFromAddress(withAccount),
+          path: hdPathString,
           message: ethUtil.stripHexPrefix(message),
-          hex: true,
         })
           .then((response) => {
             if (response.success) {
               if (
                 response.payload.address !==
-                ethUtil.toChecksumAddress(withAccount)
+                ethUtil.toChecksumAddress(accountAddress)
               ) {
                 reject(new Error('signature doesnt match the right address'));
               }
               const signature = `0x${response.payload.signature}`;
-              resolve(signature);
+              resolve({ signature, success: true });
             } else {
               reject(
                 // @ts-ignore
@@ -239,11 +247,15 @@ export class TrezorKeyring {
   /**
    * EIP-712 Sign Typed Data
    */
-  async signTypedData<T extends MessageTypes>(
-    address: string,
-    data: TypedMessage<T>,
-    { version }: { version: SignTypedDataVersion }
-  ) {
+  async signTypedData<T extends MessageTypes>({
+    version,
+    address,
+    data,
+  }: {
+    version: SignTypedDataVersion;
+    address: string;
+    data: TypedMessage<T>;
+  }) {
     const dataWithHashes = transformTypedData(data, version === 'V4');
 
     // set default values for signTypedData
@@ -260,8 +272,6 @@ export class TrezorKeyring {
 
     // This is necessary to avoid popup collision
     // between the unlock & sign trezor popups
-    const status = await this.unlock();
-    await wait(status === 'just unlocked' ? DELAY_BETWEEN_POPUPS : 0);
 
     const response = await TrezorConnect.ethereumSignTypedData({
       path: await this.#pathFromAddress(address),
@@ -281,7 +291,7 @@ export class TrezorKeyring {
       if (ethUtil.toChecksumAddress(address) !== response.payload.address) {
         throw new Error('signature doesnt match the right address');
       }
-      return response.payload.signature;
+      return response.payload;
     }
     // @ts-ignore
     throw new Error(response.payload?.error || 'Unknown error');
@@ -313,6 +323,6 @@ export class TrezorKeyring {
     if (typeof index === 'undefined') {
       throw new Error('Unknown address');
     }
-    return `${this.hdPath}/${index}`;
+    return `${pathBase}/${index}`;
   }
 }
