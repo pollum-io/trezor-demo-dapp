@@ -16,6 +16,7 @@ interface IDropdownButton extends IButton {
   fn?: (methodName: string, params?: any) => Promise<void>;
   method: string;
   coins: any[];
+  params?: any;
 }
 
 const availableIndexs = [...Array(31).keys()];
@@ -49,15 +50,24 @@ export const DropdownButton: React.FC<IDropdownButton> = ({
   fn,
   coins,
   text,
+  params,
 }) => {
   return (
     <select
       name="provider"
       onChange={(event) => {
         const values = event.target.value.split(',');
+        const methods = ['getAccountInfo', 'getPublicKey', 'signMessage'];
+        if (methods.includes(method)) {
+          fn(method, {
+            ...params,
+            slip44: values[0],
+            coin: values[1],
+          });
+          return;
+        }
         fn(method, {
-          slip44: values[0],
-          coin: values[1],
+          ...params,
         });
       }}
       id={id}

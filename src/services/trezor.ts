@@ -5,6 +5,7 @@ import TrezorConnect, {
   Device,
   DeviceEventMessage,
   DEVICE_EVENT,
+  SignTransaction,
 } from '@trezor/connect-web';
 import { transformTypedData } from '@trezor/connect-plugin-ethereum';
 import {
@@ -36,8 +37,8 @@ export interface TrezorControllerState {
   unlockedAccount: number;
 }
 
-async function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface ISignUtxoTx extends SignTransaction {
+  coin: string;
 }
 
 /**
@@ -207,6 +208,45 @@ export class TrezorKeyring {
     return Promise.resolve();
   }
 
+  async signUtxoTransaction({ inputs, outputs, coin }: ISignUtxoTx) {
+    try {
+      const { payload, success } = await TrezorConnect.signTransaction({
+        coin,
+        inputs,
+        outputs,
+      });
+
+      if (success) {
+        return { success, payload };
+      }
+      return { success: false, payload };
+    } catch (error) {
+      return { error };
+    }
+  }
+
+  async signEthTransaction({
+    tx,
+    accountIndex,
+  }: {
+    tx: any;
+    accountIndex: string;
+  }) {
+    try {
+      const { success, payload } = await TrezorConnect.ethereumSignTransaction({
+        path: `m/44'/60'/0'/0/${accountIndex}`,
+        transaction: tx,
+      });
+
+      if (success) {
+        return { success, payload };
+      }
+      return { success: false, payload };
+    } catch (error) {
+      return { error };
+    }
+  }
+
   async signMessage({
     accountIndex,
     data,
@@ -241,16 +281,20 @@ export class TrezorKeyring {
     coin: string;
     hdPath: string;
   }) {
-    const { success, payload } = await TrezorConnect.signMessage({
-      path: hdPath,
-      coin: coin,
-      message: 'UTXO example message',
-    });
+    try {
+      const { success, payload } = await TrezorConnect.signMessage({
+        path: hdPath,
+        coin: coin,
+        message: 'UTXO example message',
+      });
 
-    if (success) {
-      return payload;
+      if (success) {
+        return { success, payload };
+      }
+      return { success: false, payload };
+    } catch (error) {
+      return { error };
     }
-    return { success: false };
   }
 
   // For personal_sign, we need to prefix the message:

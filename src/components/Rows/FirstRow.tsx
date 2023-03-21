@@ -69,6 +69,30 @@ const BasicActionsCard = () => {
           coins={Object.values(coins)}
         />
 
+        <PrimaryButton
+          text="Sign transaction"
+          onClick={() =>
+            handleExecution('signUtxoTransaction', {
+              inputs: [
+                {
+                  address_n: [-2147483604, -2147483648, -2147483648, 0, 5],
+                  prev_hash:
+                    '50f6f1209ca92d7359564be803cb2c932cde7d370f7cee50fd1fad6790f6206d',
+                  prev_index: 1,
+                },
+              ],
+              outputs: [
+                {
+                  address:
+                    'bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3',
+                  amount: '10000',
+                  script_type: 'PAYTOADDRESS',
+                },
+              ],
+              coin: 'btc',
+            })
+          }
+        />
 
         <Output output={output || ' '} />
       </div>
@@ -114,6 +138,24 @@ const BasicEthereumActionsCard = () => {
             handleExecution('signMessage', {
               accountIndex: 0,
               data: 'PaliTrezor example',
+            })
+          }
+        />
+
+        <PrimaryButton
+          text="Sign transaction"
+          onClick={() =>
+            handleExecution('signEthTransaction', {
+              accountIndex: 0,
+              tx: {
+                nonce: '0x0',
+                gasPrice: '0x14',
+                gasLimit: '0x14',
+                to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+                chainId: 1,
+                value: '0x0',
+                data: '0xa9059cbb000000000000000000000000574bbb36871ba6b78e27f4b4dcfb76ea0091880b000000000000000000000000000000000000000000000000000000000bebc200',
+              },
             })
           }
         />
