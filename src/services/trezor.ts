@@ -72,6 +72,7 @@ export class TrezorKeyring {
 
   constructor(opts: TrezorControllerOptions = {}) {
     this.deserialize(opts);
+    this.hdk = new HDKey();
 
     TrezorConnect.on(DEVICE_EVENT, (event) => {
       if (hasDevicePayload(event)) {
@@ -99,7 +100,9 @@ export class TrezorKeyring {
       case 'sys':
         this.hdPath = `m/84'/57'/0'`;
         break;
-
+      case 'btc':
+        this.hdPath = "m/49'/0'/0'";
+        break;
       default:
         this.hdPath = `m/44'/${slip44}'/0'/0/0`;
         break;
@@ -137,10 +140,26 @@ export class TrezorKeyring {
     TrezorConnect.dispose();
   }
 
-  async getEthereumPublicKey() {
+  async getPublicKey({ coin, slip44 }: { coin: string; slip44: string }) {
+    switch (coin) {
+      case 'sys':
+        this.hdPath = `m/84'/57'/0'`;
+        break;
+      case 'btc':
+        this.hdPath = "m/49'/0'/0'";
+        break;
+      default:
+        this.hdPath = `m/44'/${slip44}'/0'/0/0`;
+        break;
+    }
     try {
       const { success, payload } = await TrezorConnect.getPublicKey({
-        coin: 'eth',
+        coin: coin,
+        path: this.hdPath,
+      });
+
+      console.log({
+        coin: coin,
         path: this.hdPath,
       });
 
@@ -156,14 +175,27 @@ export class TrezorKeyring {
         };
       }
 
-      return { success: false };
+      return { success: false, payload };
     } catch (error) {
       return error;
     }
   }
 
-  async getAccountByIndex({ index }: { index: number }) {
-    const account = await this.#addressFromIndex(this.hdPath, index);
+  async getAccountByIndex({
+    index,
+    coin,
+    slip44,
+  }: {
+    index: number;
+    coin: string;
+    slip44: string;
+  }) {
+    const account = await this.#addressFromIndex(
+      this.hdPath,
+      index,
+      coin,
+      slip44
+    );
     this.paths[account] = index;
 
     return account;
@@ -175,42 +207,58 @@ export class TrezorKeyring {
     return Promise.resolve();
   }
 
-  async unlock() {
-    return new Promise((resolve, reject) => {
-      TrezorConnect.getPublicKey({
-        path: this.hdPath,
-        coin: 'ETH',
-      })
-        .then((response) => {
-          if (response.success) {
-            this.hdk.publicKey = Buffer.from(response.payload.publicKey, 'hex');
-            this.hdk.chainCode = Buffer.from(response.payload.chainCode, 'hex');
-            resolve('just unlocked');
-          } else {
-            // @ts-ignore
-            reject(new Error(response.payload?.error || 'Unknown error'));
-          }
-        })
-        .catch((e) => {
-          reject(new Error(e?.toString() || 'Unknown error'));
-        });
-    });
-  }
-
   async signMessage({
     accountIndex,
     data,
+    coin,
+    slip44,
   }: {
-    accountIndex: number;
-    data: string;
+    accountIndex?: number;
+    data?: string;
+    coin?: string;
+    slip44?: string;
   }) {
-    return this.signPersonalMessage(accountIndex, data);
+    switch (coin) {
+      case 'sys':
+        this.hdPath = `m/84'/57'/0'/0/0`;
+        break;
+      case 'btc':
+        this.hdPath = "m/49'/0'/0'/0/0";
+        break;
+      default:
+        this.hdPath = `m/44'/${slip44}'/0'/0/0`;
+        break;
+    }
+
+    if (coin === 'eth') return this.signEthPersonalMessage(accountIndex, data);
+    return this.signUtxoPersonalMessage({ coin, hdPath: this.hdPath });
+  }
+
+  async signUtxoPersonalMessage({
+    coin,
+    hdPath,
+  }: {
+    coin: string;
+    hdPath: string;
+  }) {
+    const { success, payload } = await TrezorConnect.signMessage({
+      path: hdPath,
+      coin: coin,
+      message: 'UTXO example message',
+    });
+
+    if (success) {
+      return payload;
+    }
+    return { success: false };
   }
 
   // For personal_sign, we need to prefix the message:
-  async signPersonalMessage(accountIndex: number, message: string) {
+  async signEthPersonalMessage(accountIndex: number, message: string) {
     const accountAddress = await this.getAccountByIndex({
       index: accountIndex,
+      coin: 'eth',
+      slip44: '60',
     });
     return new Promise((resolve, reject) => {
       setTimeout(async () => {
@@ -274,7 +322,7 @@ export class TrezorKeyring {
     // between the unlock & sign trezor popups
 
     const response = await TrezorConnect.ethereumSignTypedData({
-      path: await this.#pathFromAddress(address),
+      path: await this.#pathFromAddress(address, 'eth', '60'),
       data: {
         types: { ...types, EIP712Domain: types.EIP712Domain ?? [] },
         message,
@@ -297,22 +345,28 @@ export class TrezorKeyring {
     throw new Error(response.payload?.error || 'Unknown error');
   }
 
-  async #addressFromIndex(basePath: string, i: number) {
+  async #addressFromIndex(
+    basePath: string,
+    i: number,
+    coin: string,
+    slip44: string
+  ) {
     this.hdPath = `${basePath}/${i}`;
-    await this.getEthereumPublicKey();
+    await this.getPublicKey({ coin, slip44 });
     const address = ethUtil
       .publicToAddress(this.publicKey, true)
       .toString('hex');
     return ethUtil.toChecksumAddress(`0x${address}`);
   }
 
-  async #pathFromAddress(address: string) {
+  async #pathFromAddress(address: string, coin: string, slip44: string) {
     const checksummedAddress = ethUtil.toChecksumAddress(address);
     let index = this.paths[checksummedAddress];
     if (typeof index === 'undefined') {
       for (let i = 0; i < MAX_INDEX; i++) {
         if (
-          checksummedAddress === (await this.#addressFromIndex(pathBase, i))
+          checksummedAddress ===
+          (await this.#addressFromIndex(pathBase, i, coin, slip44))
         ) {
           index = i;
           break;

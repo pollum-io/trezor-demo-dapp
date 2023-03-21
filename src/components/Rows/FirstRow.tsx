@@ -55,20 +55,20 @@ const BasicActionsCard = () => {
           coins={Object.values(coins)}
         />
 
-        {/* <PrimaryButton
-          text="Get account"
-          // onClick={() => handleExecution(getAccount)}
+        <DropdownButton
+          text="Get Public Key"
+          method="getPublicKey"
+          fn={handleExecution}
+          coins={Object.values(coins)}
         />
 
-        <PrimaryButton
-          text="Change account"
-          // onClick={() => handleExecution(changeAccount)}
+        <DropdownButton
+          text="Sign message"
+          method="signMessage"
+          fn={handleExecution}
+          coins={Object.values(coins)}
         />
 
-        <PrimaryButton
-          text="Disconnect"
-          // onClick={() => handleExecution(disconnect)}
-        /> */}
 
         <Output output={output || ' '} />
       </div>
@@ -97,7 +97,9 @@ const BasicEthereumActionsCard = () => {
 
         <PrimaryButton
           text="Get Public Key"
-          onClick={() => handleExecution('getEthereumPublicKey')}
+          onClick={() =>
+            handleExecution('getPublicKey', { coin: 'eth', slip44: '60' })
+          }
         />
 
         <SecondDropdownButton
