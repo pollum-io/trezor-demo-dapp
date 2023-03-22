@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePaliMethods } from '../contexts/requests';
 
 import logo from '../assets/images/logo.svg';
@@ -6,8 +6,14 @@ import trezorLogo from '../assets/images/trezorLogo.svg';
 import { useProviderContext } from '../contexts/provider';
 
 export const Header = () => {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const { setPrefix, prefix, trezor } = useProviderContext();
   const { init } = trezor;
+
+  const handleInit = async () => {
+    const isInitialized = await init();
+    setIsConnected(isInitialized);
+  };
   const {
     state: { account, network },
   } = usePaliMethods();
@@ -48,17 +54,13 @@ export const Header = () => {
         />
       </div>
 
-      <div className="grid gap-y-2 py-4 justify-center">
-        <div className="w-64 bg-brand-deepPink100 px-4 py-1 rounded-full text-sm font-poppins flex items-center">
-          Connected: {account ? account.label : 'None'}
+      <div className="grid gap-y-1 py-4 justify-center items-center">
+        <div className="w-64 h-11 bg-brand-deepPink100 px-4 py-1 rounded-full text-sm font-poppins flex items-center">
+          Connected: {isConnected ? 'True' : 'False'}
         </div>
-        <div className="w-64 bg-brand-royalblue px-4 py-1 rounded-full text-sm font-poppins flex items-center">
-          Chain ID: {network.chainId || ''}
-        </div>
-
         <div
-          onClick={init}
-          className="cursor-pointer w-64 bg-alert-darkwarning px-4 py-1 rounded-full text-sm font-poppins flex items-center"
+          onClick={handleInit}
+          className="cursor-pointer bg-bkg-4 w-64 h-12 hover:bg-brand-royalblue px-4 py-1 rounded-full text-sm font-poppins flex items-center"
         >
           Initialize Trezor
         </div>

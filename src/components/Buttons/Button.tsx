@@ -72,7 +72,7 @@ export const DropdownButton: React.FC<IDropdownButton> = ({
       }}
       id={id}
       defaultValue="ConnectTrezor"
-      className="bg-bkg-4 py-1.5 rounded-full cursor-pointer h-max font-poppins hover:bg-brand-royalblue flex flex-row p-5 items-center"
+      className="bg-bkg-4 py-1.5 rounded-full cursor-pointer h-max border-none font-poppins hover:bg-brand-royalblue flex flex-row p-5 items-center"
     >
       <option>{text}</option>
       {coins.map((option) => (
@@ -93,7 +93,7 @@ export const SecondDropdownButton: React.FC<any> = ({
   method,
   fn,
   text,
-  params
+  params,
 }) => {
   return (
     <select
@@ -106,7 +106,7 @@ export const SecondDropdownButton: React.FC<any> = ({
       }
       id={id}
       defaultValue="ConnectTrezor"
-      className="bg-bkg-4 py-1.5 rounded-full cursor-pointer h-max font-poppins hover:bg-brand-royalblue flex flex-row p-5 items-center"
+      className="bg-bkg-4 py-1.5 rounded-full cursor-pointer border-none h-max font-poppins hover:bg-brand-royalblue flex flex-row p-5 items-center"
     >
       <option>{text}</option>
       {availableIndexs.map((option) => (

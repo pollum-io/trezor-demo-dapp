@@ -70,6 +70,19 @@ const BasicActionsCard = () => {
         />
 
         <PrimaryButton
+          text="Verify message"
+          onClick={() =>
+            handleExecution('verifyMessage', {
+              coin: 'btc',
+              address: '3AnYTd2FGxJLNKL1AzxfW3FJMntp9D2KKX',
+              message: 'Example message',
+              signature:
+                'I6BrpivjCwZmScZ6BMAHWGQPo+JjX2kzKXU5LcGVfEgvFb2VfJuKo3g6eSQcykQZiILoWNUDn5rDHkwJg3EcvuY=',
+            })
+          }
+        />
+
+        <PrimaryButton
           text="Sign transaction"
           onClick={() =>
             handleExecution('signUtxoTransaction', {
@@ -139,6 +152,19 @@ const BasicEthereumActionsCard = () => {
             handleExecution('signMessage', {
               accountIndex: 0,
               data: 'PaliTrezor example',
+            })
+          }
+        />
+
+        <PrimaryButton
+          text="Verify message"
+          onClick={() =>
+            handleExecution('verifyMessage', {
+              coin: 'eth',
+              address: '0xdA0b608bdb1a4A154325C854607c68950b4F1a34',
+              message: 'Example message',
+              signature:
+                '11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c',
             })
           }
         />

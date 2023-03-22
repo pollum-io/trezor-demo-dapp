@@ -77,8 +77,16 @@ export class TrezorKeyring {
         manifest: TREZOR_CONNECT_MANIFEST,
       });
       alert('Trezor was initialized succesfully!');
+      return true;
     } catch (error) {
-      alert(error);
+      if (
+        error.message.includes('TrezorConnect has been already initialized')
+      ) {
+        alert(error.message);
+        return true;
+      }
+      alert(error.message);
+      return false;
     }
   }
 
@@ -125,6 +133,43 @@ export class TrezorKeyring {
     TrezorConnect.dispose();
   }
 
+  async verifyMessage({
+    coin,
+    address,
+    message,
+    signature,
+  }: {
+    coin: string;
+    address: string;
+    message: string;
+    signature: string;
+  }) {
+    try {
+      let method = '';
+      switch (coin) {
+        case 'eth':
+          method = 'ethereumVerifyMessage';
+          break;
+        default:
+          method = 'verifyMessage';
+      }
+
+      const { success, payload } = await TrezorConnect[method]({
+        coin,
+        address,
+        message,
+        signature,
+      });
+
+      if (success) {
+        return { success, payload };
+      }
+      return { success: false, payload };
+    } catch (error) {
+      return { error };
+    }
+  }
+
   async getPublicKey({
     coin,
     slip44,
@@ -150,11 +195,6 @@ export class TrezorKeyring {
 
     try {
       const { success, payload } = await TrezorConnect.getPublicKey({
-        coin: coin,
-        path: this.hdPath,
-      });
-
-      console.log({
         coin: coin,
         path: this.hdPath,
       });
@@ -186,7 +226,21 @@ export class TrezorKeyring {
     coin: string;
     slip44: string;
   }) {
-    this.hdPath = pathBase;
+    switch (coin) {
+      case 'sys':
+        this.hdPath = `m/84'/57'/0'`;
+        break;
+      case 'btc':
+        this.hdPath = "m/49'/0'/0'";
+        break;
+      case 'eth':
+        this.hdPath = pathBase;
+        break;
+      default:
+        this.hdPath = `m/44'/${slip44}'/0'/0`;
+        break;
+    }
+
     const account = await this.#addressFromIndex(
       this.hdPath,
       index,
