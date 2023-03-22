@@ -24,17 +24,9 @@ const TREZOR_CONNECT_MANIFEST = {
   email: 'pali@pollum.io',
 };
 
-export interface TrezorControllerOptions {
-  hdPath?: string;
-  perPage?: number;
-  setIsLoading?: () => void;
-}
-
 export interface TrezorControllerState {
   hdPath: string;
   paths: Record<string, number>;
-  perPage: number;
-  unlockedAccount: number;
 }
 
 interface ISignUtxoTx extends SignTransaction {
@@ -64,17 +56,13 @@ declare global {
 
 export class TrezorKeyring {
   hdk: HDKey = new HDKey();
-  setIsLoading: (isLoading: boolean) => void;
   hdPath: string = hdPathString;
   publicKey: Buffer;
   chainCode: Buffer;
   paths: Record<string, number> = {};
   model?: string;
 
-  constructor(opts: TrezorControllerOptions = {}) {
-    this.deserialize(opts);
-    this.hdk = new HDKey();
-
+  constructor() {
     TrezorConnect.on(DEVICE_EVENT, (event) => {
       if (hasDevicePayload(event)) {
         this.model = event.payload.features?.model;
@@ -95,8 +83,6 @@ export class TrezorKeyring {
   }
 
   async getAccountInfo({ coin, slip44 }: { coin: string; slip44: string }) {
-    this.setIsLoading(true);
-
     switch (coin) {
       case 'sys':
         this.hdPath = `m/84'/57'/0'`;
@@ -115,12 +101,10 @@ export class TrezorKeyring {
         path: this.hdPath,
       });
 
-      this.setIsLoading(false);
-
       return address.payload;
     } catch (error) {
-      this.setIsLoading(false);
       alert(error);
+      throw error;
     }
   }
 
@@ -141,7 +125,15 @@ export class TrezorKeyring {
     TrezorConnect.dispose();
   }
 
-  async getPublicKey({ coin, slip44 }: { coin: string; slip44: string }) {
+  async getPublicKey({
+    coin,
+    slip44,
+    hdPath,
+  }: {
+    coin: string;
+    slip44: string;
+    hdPath?: string;
+  }) {
     switch (coin) {
       case 'sys':
         this.hdPath = `m/84'/57'/0'`;
@@ -153,6 +145,9 @@ export class TrezorKeyring {
         this.hdPath = `m/44'/${slip44}'/0'/0/0`;
         break;
     }
+
+    if (hdPath) this.hdPath = hdPath;
+
     try {
       const { success, payload } = await TrezorConnect.getPublicKey({
         coin: coin,
@@ -191,6 +186,7 @@ export class TrezorKeyring {
     coin: string;
     slip44: string;
   }) {
+    this.hdPath = pathBase;
     const account = await this.#addressFromIndex(
       this.hdPath,
       index,
@@ -200,12 +196,6 @@ export class TrezorKeyring {
     this.paths[account] = index;
 
     return account;
-  }
-
-  async deserialize(opts: TrezorControllerOptions = {}) {
-    this.hdPath = opts.hdPath ?? hdPathString;
-    this.setIsLoading = opts.setIsLoading;
-    return Promise.resolve();
   }
 
   async signUtxoTransaction({ inputs, outputs, coin }: ISignUtxoTx) {
@@ -396,7 +386,7 @@ export class TrezorKeyring {
     slip44: string
   ) {
     this.hdPath = `${basePath}/${i}`;
-    await this.getPublicKey({ coin, slip44 });
+    await this.getPublicKey({ coin, slip44, hdPath: this.hdPath });
     const address = ethUtil
       .publicToAddress(this.publicKey, true)
       .toString('hex');

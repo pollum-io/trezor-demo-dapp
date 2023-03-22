@@ -93,13 +93,15 @@ export const SecondDropdownButton: React.FC<any> = ({
   method,
   fn,
   text,
+  params
 }) => {
   return (
     <select
       name="provider"
       onChange={(event) =>
         fn(method, {
-          index: event.target.value,
+          ...params,
+          index: +event.target.value,
         })
       }
       id={id}

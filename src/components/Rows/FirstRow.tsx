@@ -129,6 +129,7 @@ const BasicEthereumActionsCard = () => {
         <SecondDropdownButton
           text="Get address by index"
           method="getAccountByIndex"
+          params={{ coin: 'eth', slip44: '60' }}
           fn={handleExecution}
         />
 
