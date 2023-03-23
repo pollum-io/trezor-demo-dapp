@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { usePaliMethods } from '../contexts/requests';
-
 import logo from '../assets/images/logo.svg';
 import trezorLogo from '../assets/images/trezorLogo.svg';
 import { useProviderContext } from '../contexts/provider';
@@ -14,9 +12,6 @@ export const Header = () => {
     const isInitialized = await init();
     setIsConnected(isInitialized);
   };
-  const {
-    state: { account, network },
-  } = usePaliMethods();
 
   const options = {
     sys: {

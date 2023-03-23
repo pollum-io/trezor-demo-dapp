@@ -76,16 +76,13 @@ export class TrezorKeyring {
       await TrezorConnect.init({
         manifest: TREZOR_CONNECT_MANIFEST,
       });
-      alert('Trezor was initialized succesfully!');
       return true;
     } catch (error) {
       if (
         error.message.includes('TrezorConnect has been already initialized')
       ) {
-        alert(error.message);
         return true;
       }
-      alert(error.message);
       return false;
     }
   }
@@ -111,7 +108,6 @@ export class TrezorKeyring {
 
       return address.payload;
     } catch (error) {
-      alert(error);
       throw error;
     }
   }
