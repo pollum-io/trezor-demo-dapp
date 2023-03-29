@@ -54,6 +54,15 @@ const BasicActionsCard = () => {
           fn={handleExecution}
           coins={Object.values(coins)}
         />
+        <PrimaryButton
+          text="Get address"
+          onClick={() =>
+            handleExecution('getAddress', {
+              coin: 'sys',
+              index: 1,
+            })
+          }
+        />
 
         <DropdownButton
           text="Get Public Key"
@@ -147,11 +156,24 @@ const BasicEthereumActionsCard = () => {
         />
 
         <PrimaryButton
+          text="Derive account"
+          onClick={() =>
+            handleExecution('deriveAccount', {
+              index: 0,
+              slip44: 60,
+              bip: 44,
+              coin: 'eth',
+            })
+          }
+        />
+
+        <PrimaryButton
           text="Sign message"
           onClick={() =>
             handleExecution('signMessage', {
               accountIndex: 0,
               data: 'PaliTrezor example',
+              coin: 'eth',
             })
           }
         />

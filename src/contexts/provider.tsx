@@ -32,7 +32,7 @@ export const PaliWalletProvider = ({ children }: { children: any }) => {
   const [provider, setProvider] = useState(pali ?? undefined);
   const [hydrated, setHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const trezor = new TrezorKeyring({ setIsLoading } as any);
+  const trezor = new TrezorKeyring();
 
   useEffect(() => {
     const _provider = prefix === 'sys' ? window.pali : window.ethereum;
