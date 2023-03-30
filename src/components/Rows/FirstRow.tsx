@@ -172,7 +172,7 @@ const BasicEthereumActionsCard = () => {
           onClick={() =>
             handleExecution('signMessage', {
               accountIndex: 0,
-              data: 'PaliTrezor example',
+              message: 'PaliTrezor example',
               coin: 'eth',
             })
           }

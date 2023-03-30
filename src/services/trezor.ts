@@ -1,13 +1,15 @@
 import TrezorConnect, {
+  AccountInfo,
   DEVICE_EVENT,
   SignTransaction,
+  Success,
 } from '@trezor/connect-web';
 import { Buffer } from 'buffer';
 import { ethers } from 'ethers';
 import Web3 from 'web3';
 import { transformTypedData } from '@trezor/connect-plugin-ethereum';
 
-const hdPathString = `m/44'/60'/0'/0/0`;
+const initialHDPath = `m/44'/60'/0'/0/0`;
 const pathBase = `m/44'/60'/0'/0`;
 const MAX_INDEX = 1000;
 const DELAY_BETWEEN_POPUPS = 1000;
@@ -32,7 +34,7 @@ declare global {
   }
 }
 export class TrezorKeyring {
-  hdPath: string = hdPathString;
+  hdPath: string = initialHDPath;
   publicKey: Buffer;
   chainCode: Buffer;
   paths: Record<string, number> = {};
@@ -48,6 +50,13 @@ export class TrezorKeyring {
       }
     });
   }
+
+  /**
+   * Initialize Trezor script.
+   *
+   * Trezor Connect raises an error that reads "Manifest not set" if manifest is not provided. It can be either set via manifest method or passed as a param in init method.
+   * @returns true, if trezor was initialized successfully and false, if some error happen
+   */
 
   async init() {
     window.TrezorConnect = TrezorConnect;
@@ -68,23 +77,15 @@ export class TrezorKeyring {
     }
   }
 
-  convertToAddressNFormat(path: string) {
-    const pathArray = path.replace(/'/g, '').split('/');
-
-    pathArray.shift();
-
-    const addressN = [];
-
-    for (const index in pathArray) {
-      if (Number(index) <= 2 && Number(index) >= 0) {
-        addressN[Number(index)] = Number(pathArray[index]) | 0x80000000;
-      } else {
-        addressN[Number(index)] = Number(pathArray[index]);
-      }
-    }
-
-    return addressN;
-  }
+  /**
+   * This return derivated account info based in params provided.
+   *
+   * @param index - index of account for path derivation
+   * @param slip44 - network slip44 number
+   * @param bip - BIP for derivation. Example: 44, 49, 84
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @returns derivated account info or error
+   */
 
   async deriveAccount({
     index,
@@ -96,7 +97,13 @@ export class TrezorKeyring {
     slip44: number | string;
     bip: number;
     coin: string;
-  }) {
+  }): Promise<
+    | AccountInfo
+    | {
+        error: string;
+        code?: string;
+      }
+  > {
     const keypath = `m/${bip}'/${slip44}'/0'/0/${index}`;
 
     return new Promise((resolve, reject) => {
@@ -118,14 +125,26 @@ export class TrezorKeyring {
     });
   }
 
+  /**
+   * This return account info based in params provided.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param slip44 - network slip44 number
+   * @param hdPath - path derivation. Example: m/44'/57'/0'/0/0
+   * @param index - index of account for path derivation
+   * @returns derivated account info or error
+   */
+
   async getAccountInfo({
     coin,
     slip44,
     hdPath,
+    index,
   }: {
     coin: string;
     slip44: string;
     hdPath?: string;
+    index?: string;
   }) {
     switch (coin) {
       case 'sys':
@@ -135,7 +154,7 @@ export class TrezorKeyring {
         this.hdPath = "m/49'/0'/0'";
         break;
       default:
-        this.hdPath = `m/44'/${slip44}'/0'/0/0`;
+        this.hdPath = `m/44'/${slip44}'/0'/0/${index ?? 0}`;
         break;
     }
 
@@ -163,12 +182,25 @@ export class TrezorKeyring {
     return this.model;
   }
 
+  /**
+   * This removes the Trezor Connect iframe from the DOM
+   *
+   * @returns void
+   */
+
   dispose() {
-    // This removes the Trezor Connect iframe from the DOM
-    // This method is not well documented, but the code it calls can be seen
-    // here: https://github.com/trezor/connect/blob/dec4a56af8a65a6059fb5f63fa3c6690d2c37e00/src/js/iframe/builder.js#L181
     TrezorConnect.dispose();
   }
+
+  /**
+   * This verify if message is valid or not.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param address - account address that signed message
+   * @param message - message to be verified. Example: 'Test message'
+   * @param signature - signature received in sign method. Example: I6BrpivjCwZmScZ6BMAHWGQPo+JjX2kzKXU5LcGVfEgvFb2VfJuKo3g6eSQcykQZiILoWNUDn5rDHkwJg3EcvuY=
+   * @returns derivated account info or error
+   */
 
   async verifyMessage({
     coin,
@@ -190,7 +222,6 @@ export class TrezorKeyring {
         default:
           method = 'verifyMessage';
       }
-
       const { success, payload } = await TrezorConnect[method]({
         coin,
         address,
@@ -206,6 +237,15 @@ export class TrezorKeyring {
       return { error };
     }
   }
+
+  /**
+   * This return account public key.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param slip44 - network slip44 number
+   * @param hdPath - path derivation. Example: m/44'/57'/0'/0/0
+   * @returns publicKey and chainCode
+   */
 
   async getPublicKey({
     coin,
@@ -254,7 +294,16 @@ export class TrezorKeyring {
     }
   }
 
-  async getAccountByIndex({
+  /**
+   * Gets account address based in index of account in path derivation.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param slip44 - network slip44 number
+   * @param index - index of account for path derivation
+   * @returns account address
+   */
+
+  async getAccountAddressByIndex({
     index,
     coin,
     slip44,
@@ -289,6 +338,15 @@ export class TrezorKeyring {
     return account;
   }
 
+  /**
+   * This sign UTXO tx.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param inputs - utxo transaction inputs
+   * @param outputs - utxo transaction outputs
+   * @returns signature object
+   */
+
   async signUtxoTransaction({ inputs, outputs, coin }: ISignUtxoTx) {
     try {
       const { payload, success } = await TrezorConnect.signTransaction({
@@ -306,16 +364,17 @@ export class TrezorKeyring {
     }
   }
 
-  async signEthTransaction({
-    tx,
-    accountIndex,
-  }: {
-    tx: any;
-    accountIndex: string;
-  }) {
+  /**
+   * This sign EVM tx.
+   *
+   * @param index - index of account for path derivation
+   * @param tx - ethereum tx object
+   * @returns signature object
+   */
+  async signEthTransaction({ tx, index }: { tx: any; index: string }) {
     try {
       const { success, payload } = await TrezorConnect.ethereumSignTransaction({
-        path: `m/44'/60'/0'/0/${accountIndex}`,
+        path: `m/44'/60'/0'/0/${index}`,
         transaction: tx,
       });
 
@@ -328,14 +387,24 @@ export class TrezorKeyring {
     }
   }
 
+  /**
+   * This sign message.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param slip44 - network slip44 number
+   * @param message - message to be signed. Example: 'Test message'
+   * @param index - index of account for path derivation
+   * @returns signature object
+   */
+
   async signMessage({
-    accountIndex,
-    data,
+    index,
+    message,
     coin,
     slip44,
   }: {
-    accountIndex?: number;
-    data?: string;
+    index?: number;
+    message?: string;
     coin: string;
     slip44?: string;
   }) {
@@ -351,13 +420,13 @@ export class TrezorKeyring {
         break;
     }
 
-    if (coin === 'eth' && `${accountIndex}` && data) {
-      return this.signEthPersonalMessage(Number(accountIndex), data);
+    if (coin === 'eth' && `${index}` && message) {
+      return this._signEthPersonalMessage(Number(index), message);
     }
-    return this.signUtxoPersonalMessage({ coin, hdPath: this.hdPath });
+    return this._signUtxoPersonalMessage({ coin, hdPath: this.hdPath });
   }
 
-  async signUtxoPersonalMessage({
+  async _signUtxoPersonalMessage({
     coin,
     hdPath,
   }: {
@@ -381,8 +450,8 @@ export class TrezorKeyring {
   }
 
   // For personal_sign, we need to prefix the message:
-  async signEthPersonalMessage(accountIndex: number, message: string) {
-    const accountAddress = await this.getAccountByIndex({
+  async _signEthPersonalMessage(accountIndex: number, message: string) {
+    const accountAddress = await this.getAddress({
       index: accountIndex,
       coin: 'eth',
       slip44: '60',
@@ -390,7 +459,7 @@ export class TrezorKeyring {
     return new Promise((resolve, reject) => {
       setTimeout(async () => {
         TrezorConnect.ethereumSignMessage({
-          path: hdPathString,
+          path: initialHDPath,
           message: Web3.utils.stripHexPrefix(message),
         })
           .then((response) => {
@@ -459,10 +528,10 @@ export class TrezorKeyring {
         domain,
         primaryType: primaryType as any,
       },
-      metamask_v4_compat: true, // eslint-disable-line camelcase
+      metamask_v4_compat: true,
       // Trezor 1 only supports blindly signing hashes
-      domain_separator_hash, // eslint-disable-line camelcase
-      message_hash: message_hash ?? '', // eslint-disable-line camelcase
+      domain_separator_hash,
+      message_hash: message_hash ?? '',
     });
 
     if (response.success) {
@@ -489,6 +558,15 @@ export class TrezorKeyring {
     return `${address}`;
   }
 
+  /**
+   * Gets account address based in index of account in path derivation.
+   *
+   * @param coin - network symbol. Example: eth, sys, btc
+   * @param slip44 - network slip44 number
+   * @param index - index of account for path derivation
+   * @returns account address
+   */
+
   async getAddress({
     coin,
     slip44,
@@ -497,7 +575,7 @@ export class TrezorKeyring {
     coin: string;
     index: string | number;
     slip44?: string;
-  }) {
+  }): Promise<string> {
     switch (coin) {
       case 'sys':
         this.hdPath = `m/84'/57'/0'/0`;
@@ -506,7 +584,7 @@ export class TrezorKeyring {
         this.hdPath = "m/49'/0'/0'";
         break;
       default:
-        this.hdPath = `m/44'/${slip44}'/0'/0/0`;
+        this.hdPath = `m/44'/${slip44}'/0'/0`;
         break;
     }
     try {
@@ -515,11 +593,10 @@ export class TrezorKeyring {
         coin,
       });
       if (success) {
-        return { success, payload };
+        return payload.address;
       }
-      return { success: false, payload };
     } catch (error) {
-      return { error };
+      return error;
     }
   }
 
